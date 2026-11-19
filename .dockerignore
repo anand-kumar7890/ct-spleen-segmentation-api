@@ -8,8 +8,15 @@ htmlcov/
 .git
 .gitignore
 .env
+.venv
+venv/
+env/
+.idea
+.vscode
+*.md
+docs/
 
-# Repo hygiene: Do not ship full dataset or large scans in the Docker image
+# Repo hygiene: Do not ship full raw patient scans in the Docker image
 data/*
 !data/sample_ct.nii.gz
 tests/*

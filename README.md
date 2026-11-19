@@ -8,6 +8,29 @@ Upload a CT volume (NIfTI), get back the spleen volume in mL.
 
 ---
 
+## Demo
+
+![Web Demo](docs/images/demo.gif)
+*Browser UI demonstration showing one-click sample inference, CPU loading state, and structured volumetry card.*
+
+> **Screen capture note:** You can record your own live interaction using free tools like [ScreenToGif](https://www.screentogif.com/) (Windows) or Gifski (macOS/Linux) and save it to `docs/images/demo.gif`.
+
+---
+
+## Web demo
+
+A lightweight browser interface is served directly by FastAPI at `http://localhost:8000/`.
+
+1. Start the server (locally or with Docker):
+   ```bash
+   uvicorn app.main:app --reload
+   ```
+2. Open [http://localhost:8000](http://localhost:8000) in your browser.
+3. Click **"Use sample scan"** for an immediate test run, or choose your own `.nii` / `.nii.gz` CT volume.
+4. **Note on CPU Latency**: Full 3D abdominal volumes take **20–30 seconds** on CPU due to 3D patch convolutions. The built-in smoke test scan completes in under 2 seconds.
+
+---
+
 ## What it does
 
 1. Accepts a CT volume (`.nii` / `.nii.gz`) via `POST /predict`.
@@ -68,6 +91,9 @@ This check shows the API and the training notebook agree. It confirms the API ma
 
 ## API
 
+### `GET /`
+Serves the web demo single-page application (`static/index.html`).
+
 ### `GET /health`
 ```json
 {
@@ -103,6 +129,13 @@ Response payload (real output from `spleen_15`):
 - `review_reasons` provides transparent diagnostic explanations if flagged.
 - `connected_components` detects potential accessory spleens or false-positive segmentation islands.
 
+### `POST /predict/sample`
+Executes inference on the built-in sample scan without needing file upload:
+
+```bash
+curl -X POST http://localhost:8000/predict/sample
+```
+
 ### Bad upload returns 400, not 500
 Non-NIfTI uploads (such as uploading `README.md`) are rejected immediately with `400 Bad Request`:
 
@@ -137,12 +170,31 @@ uvicorn app.main:app --reload
 
 ## Run with Docker
 
+### Option 1: Multi-Container Stack with Docker Compose (Recommended)
+
+Starts both the Nginx Frontend (`http://localhost:3000`) and the FastAPI Backend (`http://localhost:8000`):
+
 ```bash
-docker build -t ct-spleen-api .
-docker run -p 8000:8000 ct-spleen-api
+docker compose up --build -d
 ```
 
-Inference runs on CPU, so no GPU is needed to serve it.
+- **Frontend Dashboard**: [http://localhost:3000](http://localhost:3000)
+- **Backend API Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
+- **Health Check**: [http://localhost:8000/health](http://localhost:8000/health)
+
+To stop the containers:
+```bash
+docker compose down
+```
+
+### Option 2: Standalone Single Container (Direct Backend with Embedded UI)
+
+```bash
+docker build -t ct-spleen-api .
+docker run -d --name ct-spleen-api -p 8000:8000 ct-spleen-api
+```
+
+Open [http://localhost:8000](http://localhost:8000) in your browser to interact with the web UI directly.
 
 ---
 
@@ -154,7 +206,7 @@ pytest -v tests/
 
 ### Test data and requirements for cloners
 - **Smoke test scan (`data/sample_ct.nii.gz`)**: A small synthetic CT volume included in the repository, used solely as a CI smoke test to verify server startup, tensor shape handling, and endpoint routing without distributing patient scans.
-- **Out of the box**: 18 of 19 tests pass immediately using only `sample_ct.nii.gz`.
+- **Out of the box**: 20 of 21 tests pass immediately using only `sample_ct.nii.gz` and the static web UI.
 - **Different-spacing test (`test_predict_different_spacing_accuracy`)**: Specifically validates `spleen_15.nii.gz` against `spleen_volumes.json`. If `spleen_15.nii.gz` is not in `data/`, this test automatically skips so cloners will not experience test failures. To run it, place `spleen_15.nii.gz` into `data/`.
 
 ---

@@ -9,6 +9,13 @@ except ImportError:
     HAS_NUMPY = False
     np = None
 
+try:
+    import nibabel as nib
+    HAS_NIBABEL = True
+except ImportError:
+    HAS_NIBABEL = False
+    nib = None
+
 from app.utils import (
     calculate_spleen_volume,
     get_nifti_metadata,
@@ -105,7 +112,7 @@ class SpleenInferenceEngine:
         self.model.eval()
         logger.info(f"Loaded checkpoint from {self.model_path} successfully.")
 
-        # Exact preprocessing transforms matching Day 1 training and validation
+        # Preprocessing transforms matching model training and validation
         self.pre_transforms = Compose(
             [
                 LoadImaged(keys="image"),
@@ -150,8 +157,17 @@ class SpleenInferenceEngine:
         """
         # 1. CT Scan Validation (OOD check, dimensions, slice thickness)
         scan_qc = validate_ct_scan_quality(file_path)
-        spacing_mm = scan_qc["spacing_mm"]
         pre_scan_warnings = scan_qc["warnings"]
+
+        # Native spacing strictly from file header zooms
+        if HAS_NIBABEL:
+            try:
+                zooms = nib.load(file_path).header.get_zooms()[:3]
+                spacing_mm = tuple(float(s) for s in zooms)
+            except Exception:
+                spacing_mm = tuple(float(s) for s in scan_qc["spacing_mm"])
+        else:
+            spacing_mm = tuple(float(s) for s in scan_qc["spacing_mm"])
 
         if not HAS_TORCH_MONAI or os.getenv("MOCK_INFERENCE", "0") == "1" or self.model is None:
             # Fallback mock prediction for fast testing environments
@@ -203,6 +219,9 @@ class SpleenInferenceEngine:
                 overlap=0.25,
             )
 
+        raw_voxels = int((outputs.argmax(1) == 1).sum().item())
+        logger.info(f"[Inference Audit] Raw model voxels before inversion (pred.argmax(1) == 1).sum(): {raw_voxels}")
+
         batch_data["pred"] = outputs
         # Apply inverse transforms to map segmentation back to original CT grid
         decollated = [self.post_transforms(i) for i in decollate_batch(batch_data)]
@@ -211,6 +230,8 @@ class SpleenInferenceEngine:
         # Extract binary mask
         mask_np = inverted_pred.squeeze().cpu().numpy().astype(np.uint8)
         binary_mask = (mask_np > 0).astype(np.uint8)
+        inv_voxels = int(binary_mask.sum())
+        logger.info(f"[Inference Audit] Voxel count after Invertd: {inv_voxels}")
 
         # Comprehensive morphologic and clinical analysis
         analysis = analyze_spleen_mask(

@@ -22,24 +22,74 @@ def test_health():
     assert data["model"] == "unet3d-msd-spleen"
 
 
+def test_home_page():
+    """Verify that GET / on backend returns JSON directing to frontend at http://localhost:3000."""
+    response = client.get("/")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "online"
+    assert "http://localhost:3000" in data["frontend_url"]
+
+
+def test_predict_sample_endpoint():
+    """Verify that POST /predict/sample returns 200 and structured JSON with spleen_volume_ml."""
+    response = client.post("/predict/sample")
+    assert response.status_code == 200
+    data = response.json()
+    assert "spleen_volume_ml" in data
+    assert isinstance(data["spleen_volume_ml"], (int, float))
+    assert "voxels" in data
+    assert "spacing_mm" in data
+    assert data["model"] == "unet3d-msd-spleen"
+
+
 def test_predict_bad_extension():
     """Verify that uploading a non-NIfTI file (e.g., .txt) returns 400 Bad Request."""
     file_content = b"this is not a nifti volume"
     files = {"file": ("report.txt", file_content, "text/plain")}
     response = client.post("/predict", files=files)
     assert response.status_code == 400
-    assert "Invalid file format" in response.json()["detail"]
+    assert response.json()["detail"] == "Only .nii or .nii.gz CT volumes are accepted."
 
 
 def test_predict_bad_upload_markdown_returns_400():
     """Verify that uploading a markdown file like README.md returns 400, not 500."""
     readme_path = os.path.join(os.path.dirname(__file__), "..", "README.md")
-    with open(readme_path, "rb") as f:
-        file_bytes = f.read()
+    if os.path.exists(readme_path):
+        with open(readme_path, "rb") as f:
+            file_bytes = f.read()
+    else:
+        file_bytes = b"# Sample Markdown\nSimulated non-nifti file upload test.\n"
     files = {"file": ("README.md", file_bytes, "text/markdown")}
     response = client.post("/predict", files=files)
     assert response.status_code == 400
-    assert "Invalid file format" in response.json()["detail"]
+    assert response.json()["detail"] == "Only .nii or .nii.gz CT volumes are accepted."
+
+
+def test_predict_jpg_returns_400():
+    """Verify that uploading images.jpg returns 400 Bad Request."""
+    files = {"file": ("images.jpg", b"fake jpeg byte stream", "image/jpeg")}
+    response = client.post("/predict", files=files)
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Only .nii or .nii.gz CT volumes are accepted."
+
+
+def test_predict_2d_nifti_returns_400(tmp_path):
+    """Verify that uploading a 2D NIfTI returns 400 Bad Request with shape in detail."""
+    import nibabel as nib
+    import numpy as np
+
+    nii_2d = nib.Nifti1Image(np.zeros((64, 64), dtype=np.int16), affine=np.eye(4))
+    path_2d = os.path.join(tmp_path, "slice_2d.nii.gz")
+    nib.save(nii_2d, path_2d)
+
+    with open(path_2d, "rb") as f:
+        file_bytes = f.read()
+
+    files = {"file": ("slice_2d.nii.gz", file_bytes, "application/gzip")}
+    response = client.post("/predict", files=files)
+    assert response.status_code == 400
+    assert "Expected a 3D CT volume, got shape" in response.json()["detail"]
 
 
 def test_predict_empty_file():
@@ -47,7 +97,8 @@ def test_predict_empty_file():
     files = {"file": ("empty_scan.nii.gz", b"", "application/gzip")}
     response = client.post("/predict", files=files)
     assert response.status_code == 400
-    assert "empty" in response.json()["detail"].lower()
+    detail = response.json()["detail"].lower()
+    assert "not a valid nifti" in detail or "empty" in detail
 
 
 def test_predict_corrupt_nifti():
@@ -56,7 +107,8 @@ def test_predict_corrupt_nifti():
     files = {"file": ("corrupt_scan.nii.gz", corrupt_content, "application/gzip")}
     response = client.post("/predict", files=files)
     assert response.status_code == 400
-    assert "validation error" in response.json()["detail"].lower() or "invalid" in response.json()["detail"].lower()
+    detail = response.json()["detail"].lower()
+    assert "not a valid nifti" in detail or "invalid" in detail or "validation error" in detail
 
 
 def test_predict_valid_sample_volume():

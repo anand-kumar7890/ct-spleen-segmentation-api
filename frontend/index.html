@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CT Spleen Volumetry & Segmentation AI</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap');
+  :root {
+    color-scheme: dark;
+    --page: #07111d;
+    --page-glow: #0b1c2a;
+    --surface: #0d1b29;
+    --surface-2: #112334;
+    --surface-3: #172c3d;
+    --border: rgba(164, 192, 211, .13);
+    --border-strong: rgba(164, 192, 211, .22);
+    --text: #edf5fa;
+    --muted: #8fa5b6;
+    --muted-2: #6f8799;
+    --teal: #39c6c2;
+    --teal-strong: #18a9a9;
+    --teal-soft: rgba(57,198,194,.11);
+    --green: #50d39a;
+    --green-soft: rgba(80,211,154,.12);
+    --amber: #f3bd69;
+    --amber-soft: rgba(243,189,105,.12);
+    --red: #ff8585;
+    --red-soft: rgba(255,133,133,.12);
+    --radius: 18px;
+    --shadow: 0 24px 70px rgba(0,0,0,.22);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  [hidden] { display: none !important; }
+  body {
+    min-height: 100vh;
+    background:
+      radial-gradient(900px 500px at 75% -10%, rgba(27,112,133,.18), transparent 65%),
+      radial-gradient(700px 500px at -10% 35%, rgba(23,74,102,.14), transparent 60%),
+      var(--page);
+    color: var(--text);
+    font-family: "DM Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    line-height: 1.55;
+    font-size: 14px;
+  }
+  button { font: inherit; }
+  :focus-visible { outline: 2px solid var(--teal); outline-offset: 3px; }
+  .app-shell { max-width: 1440px; margin: 0 auto; padding: 0 34px 54px; }
+  .topbar {
+    min-height: 82px; display: flex; align-items: center; justify-content: space-between;
+    gap: 20px; border-bottom: 1px solid var(--border); margin-bottom: 34px;
+  }
+  .brand { display: flex; align-items: center; gap: 13px; }
+  .brand-mark {
+    width: 42px; height: 42px; border-radius: 13px; display: grid; place-items: center;
+    color: #06161e; background: linear-gradient(145deg, #69e0d8, #22aeb4);
+    box-shadow: 0 8px 28px rgba(57,198,194,.2); font: 800 14px Manrope, sans-serif; letter-spacing: -.06em;
+  }
+  .brand-name { font: 800 16px Manrope, sans-serif; letter-spacing: -.035em; }
+  .brand-sub { color: var(--muted-2); font-size: 11px; letter-spacing: .11em; text-transform: uppercase; margin-top: 2px; }
+  .topbar-right { display: flex; align-items: center; gap: 16px; }
+  .top-meta { color: var(--muted-2); font-size: 12px; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 8px; white-space: nowrap;
+    border: 1px solid var(--border-strong); background: rgba(255,255,255,.035);
+    color: var(--muted); border-radius: 999px; padding: 7px 11px;
+    font-size: 11px; font-weight: 700; letter-spacing: .02em;
+  }
+  .pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; box-shadow: 0 0 10px currentColor; }
+  .pill.ok { color: var(--green); border-color: rgba(80,211,154,.25); background: var(--green-soft); }
+  .pill.warn { color: var(--amber); border-color: rgba(243,189,105,.25); background: var(--amber-soft); }
+  .pill.plain::before { display: none; }
+  .intro { display: flex; justify-content: space-between; align-items: end; gap: 20px; margin-bottom: 25px; }
+  .eyebrow { color: var(--teal); font-size: 10px; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; margin-bottom: 9px; }
+  h1 { font: 800 clamp(25px, 3vw, 34px)/1.18 Manrope, sans-serif; letter-spacing: -.055em; }
+  .lede { max-width: 660px; color: var(--muted); font-size: 13px; margin-top: 9px; }
+  .research-tag { color: #a9c0d0; border: 1px solid var(--border); background: rgba(255,255,255,.025); padding: 8px 12px; border-radius: 9px; font-size: 11px; white-space: nowrap; }
+  .notice {
+    display: flex; gap: 12px; align-items: flex-start; padding: 13px 16px; margin-bottom: 22px;
+    border: 1px solid rgba(243,189,105,.2); border-radius: 12px;
+    background: linear-gradient(90deg, rgba(243,189,105,.09), rgba(243,189,105,.035));
+    color: #d7bd91; font-size: 12px;
+  }
+  .notice::before { content: "!"; flex: 0 0 21px; width: 21px; height: 21px; display: grid; place-items: center; border-radius: 50%; background: rgba(243,189,105,.16); color: var(--amber); font-weight: 800; }
+  .notice strong { color: #f2d4a0; }
+  .workspace { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(275px, .8fr); gap: 18px; align-items: start; }
+  .panel { background: linear-gradient(155deg, rgba(18,39,56,.96), rgba(11,26,40,.98)); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+  .panel-head { padding: 19px 22px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .panel-title { font: 700 14px Manrope, sans-serif; letter-spacing: -.02em; }
+  .panel-kicker { color: var(--muted-2); font-size: 11px; margin-top: 3px; }
+  .step-number { color: var(--teal); font: 700 11px Manrope, sans-serif; background: var(--teal-soft); border: 1px solid rgba(57,198,194,.18); border-radius: 8px; padding: 5px 8px; }
+  .upload-content { padding: 22px; }
+  #dropzone {
+    min-height: 260px; display: flex; flex-direction: column; justify-content: center; align-items: center;
+    text-align: center; padding: 30px 22px; border: 1px dashed rgba(95,183,190,.48);
+    border-radius: 15px; cursor: pointer; background:
+      linear-gradient(rgba(57,198,194,.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(57,198,194,.025) 1px, transparent 1px),
+      radial-gradient(ellipse at center, rgba(30,135,145,.12), rgba(8,24,37,.18) 72%);
+    background-size: 26px 26px, 26px 26px, auto;
+    transition: border-color .18s, background-color .18s, transform .18s;
+  }
+  #dropzone:hover, #dropzone.dragover { border-color: var(--teal); background-color: rgba(57,198,194,.06); transform: translateY(-1px); }
+  .upload-icon { width: 58px; height: 58px; display: grid; place-items: center; border-radius: 17px; color: var(--teal); border: 1px solid rgba(57,198,194,.22); background: rgba(57,198,194,.1); margin-bottom: 17px; }
+  .upload-icon svg { width: 26px; height: 26px; }
+  .drop-title { font: 700 16px Manrope, sans-serif; letter-spacing: -.025em; }
+  .drop-help { max-width: 440px; color: var(--muted); font-size: 12px; margin-top: 8px; }
+  .browse-hint { color: var(--teal); font-weight: 700; }
+  .file-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 13px; padding: 12px 14px; border: 1px solid var(--border); background: rgba(255,255,255,.035); border-radius: 10px; font-size: 12px; }
+  .file-row .name { font-weight: 700; overflow-wrap: anywhere; }
+  .file-row .size { color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .actions { display: flex; gap: 9px; flex-wrap: wrap; margin-top: 17px; }
+  button { border-radius: 10px; border: 1px solid transparent; cursor: pointer; padding: 10px 15px; font-size: 12px; font-weight: 700; transition: .18s ease; }
+  button:disabled { opacity: .42; cursor: not-allowed; transform: none !important; box-shadow: none !important; }
+  button:not(:disabled):active { transform: translateY(1px); }
+  .btn-primary { color: #04191e; background: linear-gradient(135deg, #63ded4, #31b8b8); box-shadow: 0 6px 20px rgba(57,198,194,.15); }
+  .btn-primary:hover:not(:disabled) { filter: brightness(1.07); box-shadow: 0 8px 24px rgba(57,198,194,.23); }
+  .btn-secondary { color: #c7d7e1; background: rgba(255,255,255,.045); border-color: var(--border-strong); }
+  .btn-secondary:hover:not(:disabled) { border-color: rgba(57,198,194,.45); background: rgba(57,198,194,.07); color: #fff; }
+  .side-stack { display: grid; gap: 18px; }
+  .side-body { padding: 18px 20px 20px; }
+  .status-line { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+  .status-line:last-child { border-bottom: 0; padding-bottom: 0; }
+  .status-label { color: var(--muted); }
+  .status-value { color: #dce9f0; font-weight: 700; text-align: right; }
+  .model-card { display: flex; align-items: center; gap: 12px; padding: 13px; border: 1px solid var(--border); border-radius: 12px; background: rgba(255,255,255,.025); }
+  .model-icon { width: 37px; height: 37px; display: grid; place-items: center; border-radius: 11px; background: var(--teal-soft); color: var(--teal); font: 800 11px Manrope; }
+  .model-name { font-weight: 700; font-size: 12px; }
+  .model-desc { color: var(--muted); font-size: 10px; margin-top: 2px; }
+  .progress { margin-top: 16px; padding: 13px; border: 1px solid rgba(57,198,194,.2); background: rgba(57,198,194,.06); border-radius: 11px; display: flex; gap: 12px; align-items: center; }
+  .spinner { flex: none; width: 22px; height: 22px; border: 2px solid rgba(57,198,194,.2); border-top-color: var(--teal); border-radius: 50%; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .progress-title { font-weight: 700; font-size: 12px; }
+  .progress-sub { color: var(--muted); font-size: 10px; margin-top: 3px; }
+  .error { margin-top: 14px; padding: 12px 14px; color: #ffaaaa; background: var(--red-soft); border: 1px solid rgba(255,133,133,.22); border-radius: 10px; font-size: 12px; }
+  #resultsCard { margin-top: 19px; }
+  .results-head { padding: 19px 22px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .results-body { padding: 22px; }
+  .result-highlight { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; padding: 20px; border-radius: 14px; border: 1px solid rgba(57,198,194,.18); background: radial-gradient(ellipse at 80% 0%, rgba(57,198,194,.13), transparent 60%), rgba(57,198,194,.045); }
+  .vol-label { color: var(--muted); font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .14em; }
+  .vol { color: #f0fbfc; font: 800 clamp(42px, 6vw, 58px)/1.1 Manrope, sans-serif; letter-spacing: -.065em; font-variant-numeric: tabular-nums; margin-top: 8px; }
+  .vol .unit { color: var(--teal); font: 700 17px "DM Sans", sans-serif; letter-spacing: 0; margin-left: 8px; }
+  .vol-note { color: var(--muted); font-size: 11px; margin-top: 8px; }
+  .result-symbol { width: 54px; height: 54px; display: grid; place-items: center; border: 1px solid rgba(57,198,194,.2); border-radius: 15px; color: var(--teal); background: rgba(57,198,194,.08); font-size: 23px; }
+  .meta { display: grid; grid-template-columns: minmax(190px, 38%) 1fr; margin-top: 18px; font-size: 12px; }
+  .meta dt, .meta dd { padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .meta dt { color: var(--muted); }
+  .meta dd { color: #dce9f0; font-weight: 700; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+  .review { margin-top: 16px; padding: 13px 15px; color: #e8c994; background: var(--amber-soft); border: 1px solid rgba(243,189,105,.2); border-left: 3px solid var(--amber); border-radius: 10px; font-size: 11px; }
+  .review ul { margin: 7px 0 0 17px; }
+  details { margin-top: 17px; font-size: 11px; }
+  summary { cursor: pointer; color: var(--teal); font-weight: 700; }
+  pre { margin-top: 9px; padding: 14px; color: #b9cbd6; background: #081521; border: 1px solid var(--border); border-radius: 10px; overflow-x: auto; font: 11px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  .footer-note { color: var(--muted-2); text-align: center; font-size: 10px; margin-top: 25px; }
+  @media (max-width: 900px) { .app-shell { padding-left: 22px; padding-right: 22px; } .workspace { grid-template-columns: 1fr; } .side-stack { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+  @media (max-width: 620px) {
+    .app-shell { padding: 0 14px 34px; }
+    .topbar { min-height: 70px; margin-bottom: 25px; }
+    .top-meta { display: none; }
+    .intro { align-items: flex-start; flex-direction: column; gap: 12px; }
+    .research-tag { white-space: normal; }
+    .side-stack { grid-template-columns: 1fr; }
+    .panel-head, .upload-content, .results-body { padding: 16px; }
+    #dropzone { min-height: 225px; padding: 24px 15px; }
+    .actions { display: grid; grid-template-columns: 1fr; }
+    .actions button { width: 100%; }
+    .file-row { align-items: flex-start; flex-direction: column; gap: 3px; }
+    .result-highlight { padding: 16px; }
+    .meta { grid-template-columns: 1fr; }
+    .meta dt { border-bottom: 0; padding-bottom: 1px; }
+    .meta dd { padding-top: 2px; }
+  }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
+</style>
+</head>
+<body>
+<div class="app-shell">
+  <nav class="topbar" aria-label="Main navigation">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">CT</div>
+      <div>
+        <div class="brand-name">CT Spleen AI</div>
+        <div class="brand-sub">Volumetry workspace</div>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <span class="top-meta">Research environment</span>
+      <span class="pill" id="serviceStatus"><span id="statusText">Connecting</span></span>
+    </div>
+  </nav>
+
+  <main>
+    <section class="intro">
+      <div>
+        <div class="eyebrow">AI-assisted medical imaging</div>
+        <h1>CT Spleen Volumetry</h1>
+        <p class="lede">Upload an abdominal CT volume to generate an automated spleen segmentation and volume estimate, powered by a 3D U-Net model built with MONAI.</p>
+      </div>
+      <div class="research-tag">3D U-Net <span aria-hidden="true">·</span> MONAI <span aria-hidden="true">·</span> NIfTI</div>
+    </section>
+
+    <div class="notice">
+      <div><strong>Research prototype — not for clinical diagnosis.</strong> Do not upload identifiable patient data. This model segments the spleen only, was trained on 41 public scans (MSD Task09), and has no separate test set. Results require independent clinical validation.</div>
+    </div>
+
+    <div class="workspace">
+      <section class="panel" aria-labelledby="uploadHeading">
+        <div class="panel-head">
+          <div>
+            <div class="panel-title" id="uploadHeading">Upload CT scan</div>
+            <div class="panel-kicker">Select a NIfTI volume to begin analysis</div>
+          </div>
+          <span class="step-number">STEP 01</span>
+        </div>
+        <div class="upload-content">
+          <div class="drop" id="dropzone" role="button" tabindex="0" aria-describedby="dropHelp">
+            <div class="upload-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4"/><path d="m7 9 5-5 5 5"/><path d="M4 16.5v2A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5v-2"/></svg>
+            </div>
+            <p class="drop-title">Drag and drop your CT volume</p>
+            <p class="drop-help" id="dropHelp"><span class="browse-hint">Browse files</span> or drop a file here. Supported formats: .nii and .nii.gz. CPU inference typically takes 20–30 seconds.</p>
+          </div>
+          <input type="file" id="fileInput" accept=".nii,.gz,.nii.gz" hidden>
+
+          <div class="file-row" id="filePreview" hidden>
+            <span class="name" id="fileName"></span>
+            <span class="size" id="fileSize"></span>
+          </div>
+
+          <div class="actions">
+            <button type="button" id="btnRun" class="btn-primary" disabled>Run spleen analysis</button>
+            <button type="button" id="btnSample" class="btn-secondary">Try sample scan</button>
+            <button type="button" id="btnDownloadMask" class="btn-secondary" hidden>Download segmentation mask</button>
+          </div>
+
+          <div class="progress" id="progressBox" role="status" hidden>
+            <div class="spinner" aria-hidden="true"></div>
+            <div>
+              <p class="progress-title" id="progressTitle">Running inference</p>
+              <p class="progress-sub">Preprocessing, sliding-window prediction and mapping the mask to the original scan. <span id="timer">Elapsed: 0.0 s</span></p>
+            </div>
+          </div>
+          <div class="error" id="alertBox" role="alert" hidden></div>
+        </div>
+      </section>
+
+      <aside class="side-stack" aria-label="Analysis information">
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <div class="panel-title">Analysis status</div>
+              <div class="panel-kicker">Inference service and runtime</div>
+            </div>
+            <span class="step-number">LIVE</span>
+          </div>
+          <div class="side-body">
+            <div class="status-line"><span class="status-label">API service</span><span class="status-value" id="sideServiceStatus">Connecting...</span></div>
+            <div class="status-line"><span class="status-label">Inference device</span><span class="status-value" id="sideDevice">CPU</span></div>
+            <div class="status-line"><span class="status-label">Input format</span><span class="status-value">NIfTI volume</span></div>
+            <div class="status-line"><span class="status-label">Task</span><span class="status-value">Spleen segmentation</span></div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <div class="panel-title">Model information</div>
+              <div class="panel-kicker">Current inference pipeline</div>
+            </div>
+            <span class="step-number">MODEL</span>
+          </div>
+          <div class="side-body">
+            <div class="model-card">
+              <div class="model-icon">3D</div>
+              <div>
+                <div class="model-name" id="sideModelName">3D U-Net · MONAI</div>
+                <div class="model-desc">MSD Task09 Spleen research model</div>
+              </div>
+            </div>
+            <div class="status-line"><span class="status-label">Training scans</span><span class="status-value">41 public scans</span></div>
+            <div class="status-line"><span class="status-label">Output</span><span class="status-value">Mask + volume (mL)</span></div>
+            <div class="status-line"><span class="status-label">Validation</span><span class="status-value">Research only</span></div>
+          </div>
+        </section>
+      </aside>
+    </div>
+
+    <section class="panel" id="resultsCard" aria-live="polite" hidden>
+      <div class="results-head">
+        <div>
+          <div class="panel-title">Segmentation results</div>
+          <div class="panel-kicker">Automated measurements from the uploaded CT volume</div>
+        </div>
+        <span class="step-number">STEP 02</span>
+      </div>
+      <div class="results-body">
+        <div class="result-highlight">
+          <div>
+            <p class="vol-label">Estimated spleen volume</p>
+            <p class="vol"><span id="resVolume">-</span><span class="unit">mL</span></p>
+            <p class="vol-note" id="resNote"></p>
+          </div>
+          <div class="result-symbol" aria-hidden="true">⌁</div>
+        </div>
+        <dl class="meta">
+          <dt>Voxels in segmentation mask</dt><dd id="resVoxels">-</dd>
+          <dt>Voxel spacing (file header)</dt><dd id="resSpacing">-</dd>
+          <dt>Connected components</dt><dd id="resComponents">-</dd>
+          <dt>Automated validation checks</dt><dd><span class="pill plain" id="resReview">-</span></dd>
+          <dt>Model identifier</dt><dd id="resModel">-</dd>
+        </dl>
+        <div class="review" id="reviewBox" hidden>
+          <p><strong>Human review recommended</strong></p>
+          <ul id="reviewReasons"></ul>
+        </div>
+        <details>
+          <summary>View raw API response</summary>
+          <pre id="rawJson"></pre>
+        </details>
+      </div>
+    </section>
+
+    <p class="footer-note">CT Spleen AI · Research demonstration only · Not intended for diagnosis or treatment decisions</p>
+  </main>
+</div>
+<script>
+  const $ = id => document.getElementById(id);
+  let selectedFile = null;
+  let timerInterval = null;
+  let startTime = 0;
+
+  /* ---- service status ---- */
+  async function checkHealth() {
+    try {
+      const res = await fetch("/health");
+      if (!res.ok) throw new Error("bad status");
+      const data = await res.json().catch(() => ({}));
+      const bits = [data.model, data.device].filter(Boolean).join(" on ");
+      $("serviceStatus").className = "pill ok";
+      $("statusText").textContent = bits ? `API online (${bits})` : "API online";
+      if ($("sideServiceStatus")) $("sideServiceStatus").textContent = "Online";
+      if ($("sideDevice") && data.device) $("sideDevice").textContent = data.device.toUpperCase();
+      if ($("sideModelName") && data.model) $("sideModelName").textContent = `${data.model} · MONAI`;
+    } catch (e) {
+      $("serviceStatus").className = "pill warn";
+      $("statusText").textContent = "API unreachable";
+      if ($("sideServiceStatus")) $("sideServiceStatus").textContent = "Offline / Connecting...";
+    }
+  }
+  checkHealth();
+  setInterval(checkHealth, 30000);
+
+  /* ---- file selection ---- */
+  const dropzone = $("dropzone");
+  const fileInput = $("fileInput");
+
+  dropzone.addEventListener("click", () => fileInput.click());
+  dropzone.addEventListener("keydown", e => {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fileInput.click(); }
+  });
+  dropzone.addEventListener("dragover", e => { e.preventDefault(); dropzone.classList.add("dragover"); });
+  dropzone.addEventListener("dragleave", () => dropzone.classList.remove("dragover"));
+  dropzone.addEventListener("drop", e => {
+    e.preventDefault();
+    dropzone.classList.remove("dragover");
+    if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+  });
+  fileInput.addEventListener("change", e => {
+    if (e.target.files.length) handleFile(e.target.files[0]);
+  });
+
+  function handleFile(file) {
+    const name = file.name.toLowerCase();
+    if (!name.endsWith(".nii") && !name.endsWith(".nii.gz")) {
+      selectedFile = null;
+      $("filePreview").hidden = true;
+      $("btnRun").disabled = true;
+      showError("That file is not a NIfTI volume. Choose a .nii or .nii.gz CT scan (single images such as JPG or PNG cannot give a volume).");
+      return;
+    }
+    hideError();
+    selectedFile = file;
+    $("fileName").textContent = file.name;
+    $("fileSize").textContent = (file.size / (1024 * 1024)).toFixed(2) + " MB";
+    $("filePreview").hidden = false;
+    $("btnRun").disabled = false;
+    $("btnDownloadMask").hidden = true;
+  }
+
+  /* ---- busy state ---- */
+  function setBusy(busy, title) {
+    $("btnRun").disabled = busy || !selectedFile;
+    $("btnSample").disabled = busy;
+    $("btnDownloadMask").disabled = busy;
+    $("progressBox").hidden = !busy;
+    clearInterval(timerInterval);
+    if (busy) {
+      $("progressTitle").textContent = title || "Running inference";
+      startTime = Date.now();
+      $("timer").textContent = "Elapsed: 0.0 s";
+      timerInterval = setInterval(() => {
+        $("timer").textContent = `Elapsed: ${((Date.now() - startTime) / 1000).toFixed(1)} s`;
+      }, 200);
+    }
+  }
+
+  function showError(msg) { $("alertBox").textContent = msg; $("alertBox").hidden = false; }
+  function hideError() { $("alertBox").hidden = true; }
+
+  function errorText(data, status) {
+    const d = data && data.detail;
+    if (typeof d === "string") return d;
+    if (d) return JSON.stringify(d);
+    return `Request failed (HTTP ${status}).`;
+  }
+
+  /* ---- results ---- */
+  function displayResult(d, seconds) {
+    hideError();
+    $("resVolume").textContent = d.spleen_volume_ml;
+    $("resNote").textContent =
+      `Processed in ${seconds.toFixed(1)} s. Research output, not a clinical measurement.`;
+    $("resVoxels").textContent = Number(d.voxels).toLocaleString();
+    $("resSpacing").textContent =
+      (d.spacing_mm || []).map(v => Number(v).toFixed(2)).join(" x ") + " mm";
+    $("resComponents").textContent = d.connected_components ?? "n/a";
+
+    const flagged = d.needs_review === true;
+    const badge = $("resReview");
+    badge.className = flagged ? "pill warn" : "pill ok";
+    badge.textContent = flagged ? "Review recommended" : "Passed";
+
+    const list = $("reviewReasons");
+    list.replaceChildren();
+    const reasons = Array.isArray(d.review_reasons) ? d.review_reasons : [];
+    reasons.forEach(r => {
+      const li = document.createElement("li");
+      li.textContent = r;
+      list.appendChild(li);
+    });
+    $("reviewBox").hidden = !(flagged && reasons.length);
+
+    $("resModel").textContent = d.model || "unet3d-msd-spleen";
+    const raw = { ...d };
+    delete raw.mask;
+    $("rawJson").textContent = JSON.stringify(raw, null, 2);
+
+    $("resultsCard").hidden = false;
+    $("resultsCard").scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  async function executeInference(url, body, isUpload) {
+    $("resultsCard").hidden = true;
+    hideError();
+    setBusy(true, "Running inference");
+    const t0 = Date.now();
+    try {
+      const res = await fetch(url, { method: "POST", body });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(errorText(data, res.status));
+      displayResult(data, (Date.now() - t0) / 1000);
+      $("btnDownloadMask").hidden = !isUpload;
+    } catch (err) {
+      showError(err.message || "Could not reach the API. Is the server running?");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  $("btnRun").onclick = () => {
+    if (!selectedFile) return showError("Choose a CT scan first.");
+    const fd = new FormData();
+    fd.append("file", selectedFile);
+    executeInference("/predict", fd, true);
+  };
+
+  $("btnSample").onclick = () => {
+    $("btnDownloadMask").hidden = true;
+    executeInference("/predict/sample", null, false);
+  };
+
+  $("btnDownloadMask").onclick = async () => {
+    if (!selectedFile) return;
+    setBusy(true, "Generating mask file");
+    try {
+      const fd = new FormData();
+      fd.append("file", selectedFile);
+      const res = await fetch("/predict/mask", { method: "POST", body: fd });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(errorText(data, res.status));
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = selectedFile.name.replace(/\.nii(\.gz)?$/i, "") + "_spleen_mask.nii.gz";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      showError(e.message || "Could not generate the mask file.");
+    } finally {
+      setBusy(false);
+    }
+  };
+</script>
+</body>
+</html>
