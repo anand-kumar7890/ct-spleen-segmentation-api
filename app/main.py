@@ -29,9 +29,9 @@ class HealthResponse(BaseModel):
 
 
 class PredictResponse(BaseModel):
-    spleen_volume_ml: float = Field(..., description="Calculated spleen volume in milliliters (mL)", json_schema_extra={"example": 164.6})
-    voxels: int = Field(..., description="Number of segmented spleen voxels", json_schema_extra={"example": 52350})
-    spacing_mm: List[float] = Field(..., description="Voxel spacing in mm [dx, dy, dz]", json_schema_extra={"example": [0.8, 0.8, 1.5]})
+    spleen_volume_ml: float = Field(..., description="Calculated spleen volume in milliliters (mL)", json_schema_extra={"example": 111.7})
+    voxels: int = Field(..., description="Number of segmented spleen voxels", json_schema_extra={"example": 40788})
+    spacing_mm: List[float] = Field(..., description="Voxel spacing in mm [dx, dy, dz]", json_schema_extra={"example": [0.74, 0.74, 5.0]})
     needs_review: bool = Field(..., description="Flag indicating if mask is empty, fragmented, or volume is outside plausible range", json_schema_extra={"example": False})
     review_reasons: List[str] = Field(default_factory=list, description="Diagnostic explanations if manual review is recommended", json_schema_extra={"example": []})
     connected_components: int = Field(default=1, description="Number of isolated 3D mask segments (detects fragmentation)", json_schema_extra={"example": 1})
