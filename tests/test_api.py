@@ -98,10 +98,12 @@ def test_predict_valid_sample_volume():
 
 def test_predict_different_spacing_accuracy():
     """
-    Critical test: Run a real scan whose native spacing is NOT 1.5 x 1.5 x 2.0 mm
-    (e.g. spleen_15 with spacing [0.74, 0.74, 5.0] mm) and verify that the predicted
-    spleen volume matches the known benchmark from spleen_volumes.json (111.7 mL).
-    This proves that the predicted mask is accurately mapped back to native scan coordinates.
+    Test on a real scan whose native spacing is NOT 1.5 x 1.5 x 2.0 mm
+    (spleen_15 with spacing [0.74, 0.74, 5.0] mm) and verify that the predicted
+    spleen volume matches the Colab reference prediction from spleen_volumes.json (111.7 mL).
+    This confirms the API matches the notebook pipeline in native space.
+    If spleen_15.nii.gz is not present, this test skips automatically so cloners
+    can run pytest without needing the full dataset.
     """
     spleen_15_path = os.path.join(os.path.dirname(__file__), "..", "data", "spleen_15.nii.gz")
     if not os.path.exists(spleen_15_path):

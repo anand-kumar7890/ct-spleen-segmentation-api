@@ -15,7 +15,7 @@ Upload a CT volume (NIfTI), get back the spleen volume in mL.
 3. Runs sliding-window 3D U-Net inference (160 x 160 x 160 patches).
 4. Maps the predicted mask back to the original image space using MONAI `Invertd`.
 5. Computes spleen volume = voxel count x voxel volume (from the NIfTI header spacing).
-6. Returns structured JSON with morphologic and clinical quality guardrails.
+6. Returns structured JSON with automated sanity checks.
 
 ---
 
@@ -25,7 +25,7 @@ Upload a CT volume (NIfTI), get back the spleen volume in mL.
 |---|---|
 | Validation Dice (best checkpoint, resampled space) | 0.9375 |
 | Validation Dice (original image spacing) | 0.9427 |
-| **CPU Inference Latency** | **23.0 s** (full $512 \times 512 \times 38$ volume) / **1.8 s** (sample test scan) |
+| **CPU Inference Latency** | **23.0 s** (`spleen_15`, $512 \times 512 \times 38$ volume on CPU) |
 
 **Read this before trusting the number:**
 - Dataset: Medical Segmentation Decathlon, Task09 Spleen (41 labeled CT scans, ~1.50 GB archive).
@@ -33,27 +33,27 @@ Upload a CT volume (NIfTI), get back the spleen volume in mL.
 - The best checkpoint (epoch 176 of 200) was selected using the validation score, so the reported Dice is optimistically biased. Treat it as an upper estimate, not a generalization measure.
 - Nine validation scans is a small sample. Variance across scans is high.
 
-### Visualizations & Day 1 Overlays
+### Visualizations
 
 ![Training Curves](docs/images/metrics_plot.png)
 *Figure 1: Epoch Average Loss and Validation Mean Dice across 200 epochs (best metric 0.9375 at epoch 176).*
 
 ![Validation Overlay 1](docs/images/validation_overlay_1.png)
-*Figure 2: Validation case at axial slice 80 — Original CT, Ground Truth label, and 3D U-Net predicted mask.*
+*Figure 2: Validation case at axial slice 80 — Original CT, validation label, and 3D U-Net predicted mask.*
 
 ---
 
-## 🔬 Different-Spacing Benchmark Test (The One That Matters)
+## Different-spacing test
 
-To mathematically prove that the predicted segmentation mask is accurately inverted back to the patient's native acquisition space (and not evaluated in resampled $1.5 \times 1.5 \times 2.0\text{ mm}$ space), the API was tested on **`spleen_15`**:
+To verify that the predicted segmentation mask is accurately mapped back to native space (rather than evaluated in resampled $1.5 \times 1.5 \times 2.0\text{ mm}$ space), the API was tested on **`spleen_15`**:
 - **Native Scan Spacing**: $0.74 \times 0.74 \times 5.0\text{ mm}$ ($\text{voxel volume} \approx 2.74\text{ mm}^3$ vs resampled $4.50\text{ mm}^3$)
 - **Native Dimensions**: $512 \times 512 \times 38$
-- **Ground Truth Benchmark in `spleen_volumes.json`**: **111.7 mL**
+- **Colab reference prediction (`spleen_volumes.json`)**: **111.7 mL**
 - **API `/predict` Measured Output**: **111.7 mL** (40,788 voxels $\times 2.7397\text{ mm}^3 / 1000 = 111.748\text{ mL}$)
 
-$$\text{Calculated Volume: } 111.7\text{ mL} \equiv \text{Ground Truth: } 111.7\text{ mL}$$
+$$\text{API Output: } 111.7\text{ mL} \equiv \text{Colab Reference Prediction: } 111.7\text{ mL}$$
 
-An exact match to 0.1 mL confirms coordinate inversion integrity.
+This check shows the API and the training notebook agree. It confirms the API matches the notebook pipeline in native space (it does not prove the volume is anatomically correct, as `spleen_15` comes from the unlabeled test set).
 
 ---
 
@@ -62,7 +62,7 @@ An exact match to 0.1 mL confirms coordinate inversion integrity.
 - Architecture: MONAI 3D `UNet` (channels 16-32-64-128-256, strides 2, 2 residual units, BatchNorm), 2 output classes.
 - Loss / metric: Dice.
 - Training: 200 epochs on a Google Colab T4 GPU, based on the official MONAI spleen segmentation tutorial.
-- Contribution of this repo beyond the tutorial: the inference pipeline, coordinate inversion, volume calculation, non-blocking async API, validation guardrails, tests, and Docker packaging.
+- Contribution of this repo beyond the tutorial: the inference pipeline, coordinate inversion, volume calculation, non-blocking async API, sanity checks, tests, and Docker packaging.
 
 ---
 
@@ -85,7 +85,7 @@ Multipart upload with a `file` field containing a `.nii` or `.nii.gz` CT volume.
 curl -F "file=@scan.nii.gz" http://localhost:8000/predict
 ```
 
-Real response payload (from `spleen_15`):
+Response payload (real output from `spleen_15`):
 ```json
 {
   "spleen_volume_ml": 111.7,
@@ -99,11 +99,11 @@ Real response payload (from `spleen_15`):
 ```
 
 - **Execution Latency**: 23.00 seconds on CPU.
-- `needs_review` is `true` when the mask is empty, fragmented across disconnected components, or the volume is outside a plausible range (<30 mL or >650 mL).
+- `needs_review` is `true` when the mask is empty, fragmented across disconnected components, or the volume is outside a plausible range (<30 mL or >650 mL), so a human checks the result instead of trusting it.
 - `review_reasons` provides transparent diagnostic explanations if flagged.
 - `connected_components` detects potential accessory spleens or false-positive segmentation islands.
 
-### Bad Upload Handling (Returns 400, Not 500)
+### Bad upload returns 400, not 500
 Non-NIfTI uploads (such as uploading `README.md`) are rejected immediately with `400 Bad Request`:
 
 ```bash
@@ -144,20 +144,25 @@ docker run -p 8000:8000 ct-spleen-api
 
 Inference runs on CPU, so no GPU is needed to serve it.
 
+---
+
 ## Tests
 
 ```bash
 pytest -v tests/
 ```
 
-Tests cover the health endpoint, bad upload 400 validation, prediction accuracy on different-spacing scans, and volume mathematics.
+### Test data and requirements for cloners
+- **Smoke test scan (`data/sample_ct.nii.gz`)**: A small synthetic CT volume included in the repository, used solely as a CI smoke test to verify server startup, tensor shape handling, and endpoint routing without distributing patient scans.
+- **Out of the box**: 18 of 19 tests pass immediately using only `sample_ct.nii.gz`.
+- **Different-spacing test (`test_predict_different_spacing_accuracy`)**: Specifically validates `spleen_15.nii.gz` against `spleen_volumes.json`. If `spleen_15.nii.gz` is not in `data/`, this test automatically skips so cloners will not experience test failures. To run it, place `spleen_15.nii.gz` into `data/`.
 
 ---
 
 ## Repo Hygiene
 
-- **Minimal Scan Footprint**: Only a lightweight synthetic test sample (`data/sample_ct.nii.gz`, ~500 KB) is tracked in Git.
-- **Docker Isolation**: `.dockerignore` and `.gitignore` exclude raw dataset tarballs, full patient CT volumes, and temporary mask outputs from being shipped into the Docker image or committed to version control.
+- **Minimal Scan Footprint**: Only the lightweight synthetic smoke test volume (`data/sample_ct.nii.gz`, ~500 KB) is tracked in Git.
+- **Docker Isolation**: `.dockerignore` and `.gitignore` exclude raw dataset archives, full patient CT volumes, and temporary prediction masks from being shipped into the Docker image or committed to version control.
 
 ---
 
