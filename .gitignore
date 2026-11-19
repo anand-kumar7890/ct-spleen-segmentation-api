@@ -1,0 +1,36 @@
+# Byte-compiled / optimized files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Caches & Test outputs
+.pytest_cache/
+.coverage
+htmlcov/
+.cache/
+
+# Virtual Environments
+.env
+.venv
+env/
+venv/
+ENV/
+
+# Output predictions & temporary test artifacts
+*_mask.nii.gz
+predicted_*.nii.gz
+out/
+
+# Repo hygiene: Only commit small sample scan, ignore full scans
+data/*
+!data/sample_ct.nii.gz
+tests/*.nii.gz
+!tests/sample_ct.nii.gz
+*.nii.gz
+!data/sample_ct.nii.gz
+!tests/sample_ct.nii.gz
+
+# OS specific files
+.DS_Store
+Thumbs.db
