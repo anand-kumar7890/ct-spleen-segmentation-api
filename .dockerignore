@@ -1,0 +1,22 @@
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache
+.coverage
+htmlcov/
+.git
+.gitignore
+.env
+
+# Repo hygiene: Do not ship full dataset or large scans in the Docker image
+data/*
+!data/sample_ct.nii.gz
+tests/*
+!tests/sample_ct.nii.gz
+!tests/test_api.py
+!tests/test_units.py
+!tests/__init__.py
+*.nii.gz
+!data/sample_ct.nii.gz
+!tests/sample_ct.nii.gz
