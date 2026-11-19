@@ -143,7 +143,7 @@ def analyze_spleen_mask(
     # Empty mask guard
     if voxels == 0 or volume_ml <= 0.0:
         review_reasons.append(
-            "Empty segmentation mask (0 spleen voxels detected). Verify organ presence, prior splenectomy, or contrast phase."
+            "Empty segmentation mask (0 spleen voxels detected). Possible segmentation failure or invalid input."
         )
         return {
             "spleen_volume_ml": 0.0,
@@ -153,14 +153,14 @@ def analyze_spleen_mask(
             "review_reasons": review_reasons,
         }
 
-    # Volume physiological sanity bounds
+    # Volume sanity bounds
     if volume_ml < min_plausible_ml:
         review_reasons.append(
-            f"Spleen volume ({volume_ml:.1f} mL) is below physiological adult minimum ({min_plausible_ml:.1f} mL). Possible hypoplasia, partial volume loss, or segmentation under-call."
+            "Volume below plausible range. Possible segmentation failure or invalid input."
         )
     elif volume_ml > max_plausible_ml:
         review_reasons.append(
-            f"Spleen volume ({volume_ml:.1f} mL) exceeds normal upper threshold ({max_plausible_ml:.1f} mL). Clinical indication of splenomegaly or potential false-positive bleed."
+            "Volume above plausible range. Possible segmentation failure or invalid input."
         )
 
     # Connected component analysis for fragmentation

@@ -65,7 +65,7 @@ class TestSpleenVolumetry(unittest.TestCase):
         self.assertEqual(analysis["spleen_volume_ml"], 1.0)
         self.assertEqual(analysis["connected_components"], 1)
         self.assertTrue(analysis["needs_review"]) # Volume < 30 mL
-        self.assertTrue(any("below physiological adult minimum" in r for r in analysis["review_reasons"]))
+        self.assertTrue(any("Volume below plausible range" in r for r in analysis["review_reasons"]))
 
         # Fragmented mask (2 separate components)
         mask2 = np.zeros((50, 50, 50), dtype=np.uint8)

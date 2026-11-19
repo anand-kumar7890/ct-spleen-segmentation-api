@@ -5,8 +5,11 @@ import logging
 from typing import List, Optional
 from contextlib import asynccontextmanager
 
+import nibabel as nib
 from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks, status
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 
@@ -62,6 +65,36 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Enable Cross-Origin Resource Sharing (CORS) for decoupled frontend services
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Static files and Web UI
+STATIC_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "static"))
+if not os.path.exists(STATIC_DIR):
+    STATIC_DIR = os.path.abspath("static")
+
+if os.path.exists(STATIC_DIR):
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+
+@app.get("/", tags=["Root"])
+def root():
+    """Backend service root. Dedicated frontend is hosted at http://localhost:3000."""
+    return {
+        "service": "CT Spleen Segmentation & Volumetry API",
+        "version": "1.0.0",
+        "status": "online",
+        "docs_url": "/docs",
+        "frontend_url": "http://localhost:3000",
+        "message": "CT Spleen API backend is running. Open http://localhost:3000 for the web frontend interface.",
+    }
+
 
 def cleanup_file(path: str):
     """Safely delete a temporary file if it exists."""
@@ -73,20 +106,16 @@ def cleanup_file(path: str):
         logger.warning(f"Failed to remove temporary file {path}: {e}")
 
 
-def validate_filename(filename: Optional[str]) -> str:
-    """Validate that the uploaded file has a supported NIfTI extension."""
-    if not filename:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Filename is missing or empty.",
-        )
-    lower = filename.lower()
-    if not (lower.endswith(".nii.gz") or lower.endswith(".nii")):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid file format for '{filename}'. Only NIfTI volumes (.nii.gz or .nii) are supported.",
-        )
-    return lower
+def validate_upload(filename: str, path: str):
+    name = (filename or "").lower()
+    if not (name.endswith(".nii") or name.endswith(".nii.gz")):
+        raise HTTPException(400, "Only .nii or .nii.gz CT volumes are accepted.")
+    try:
+        shape = nib.load(path).shape
+    except Exception:
+        raise HTTPException(400, "File is not a valid NIfTI volume.")
+    if len(shape) != 3 or min(shape) < 16:
+        raise HTTPException(400, f"Expected a 3D CT volume, got shape {shape}.")
 
 
 @app.get("/health", response_model=HealthResponse, tags=["Health"])
@@ -106,6 +135,36 @@ async def health_check():
     )
 
 
+async def run_prediction_on_file(
+    file_path: str, engine: SpleenInferenceEngine
+) -> PredictResponse:
+    """Helper to execute non-blocking inference and format structured PredictResponse."""
+    try:
+        # Non-blocking CPU execution: runs heavy 3D inference in threadpool
+        result = await run_in_threadpool(engine.predict, file_path)
+    except ValueError as ve:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"NIfTI validation error: {str(ve)}",
+        )
+    except Exception as e:
+        logger.error(f"Inference failure: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Inference execution failed: {str(e)}",
+        )
+
+    return PredictResponse(
+        spleen_volume_ml=result["spleen_volume_ml"],
+        voxels=result["voxels"],
+        spacing_mm=result["spacing_mm"],
+        needs_review=result.get("needs_review", False),
+        review_reasons=result.get("review_reasons", []),
+        connected_components=result.get("connected_components", 1),
+        model=result["model"],
+    )
+
+
 @app.post("/predict", response_model=PredictResponse, tags=["Inference"])
 async def predict_volume(
     file: UploadFile = File(..., description="Abdominal CT volume in .nii.gz or .nii format")
@@ -114,7 +173,10 @@ async def predict_volume(
     Accepts a 3D CT scan upload (.nii.gz), runs 3D U-Net inference,
     and returns structured output with spleen volume (mL), voxel count, and voxel spacing.
     """
-    validate_filename(file.filename)
+    filename = file.filename or ""
+    name = filename.lower()
+    if not (name.endswith(".nii") or name.endswith(".nii.gz")):
+        raise HTTPException(400, "Only .nii or .nii.gz CT volumes are accepted.")
 
     # Save upload to a secure temporary file
     temp_in = tempfile.NamedTemporaryFile(suffix=".nii.gz", delete=False)
@@ -125,44 +187,39 @@ async def predict_volume(
         with open(temp_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
-        file_size = os.path.getsize(temp_path)
-        if file_size == 0:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Uploaded file is empty (0 bytes).",
-            )
+        validate_upload(filename, temp_path)
 
         engine: SpleenInferenceEngine = getattr(app.state, "engine", None)
         if engine is None:
             engine = get_inference_engine()
 
-        try:
-            # Non-blocking CPU execution: runs heavy 3D inference in threadpool
-            result = await run_in_threadpool(engine.predict, temp_path)
-        except ValueError as ve:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"NIfTI validation error: {str(ve)}",
-            )
-        except Exception as e:
-            logger.error(f"Inference failure: {e}", exc_info=True)
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Inference execution failed: {str(e)}",
-            )
-
-        return PredictResponse(
-            spleen_volume_ml=result["spleen_volume_ml"],
-            voxels=result["voxels"],
-            spacing_mm=result["spacing_mm"],
-            needs_review=result.get("needs_review", False),
-            review_reasons=result.get("review_reasons", []),
-            connected_components=result.get("connected_components", 1),
-            model=result["model"],
-        )
+        return await run_prediction_on_file(temp_path, engine)
 
     finally:
         cleanup_file(temp_path)
+
+
+@app.post("/predict/sample", response_model=PredictResponse, tags=["Inference"])
+async def predict_sample():
+    """
+    Runs prediction on the built-in sample scan (data/sample_ct.nii.gz).
+    Useful for testing and browser demo without requiring file upload.
+    """
+    sample_path = "data/sample_ct.nii.gz"
+    if not os.path.exists(sample_path):
+        sample_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data", "sample_ct.nii.gz"))
+
+    if not os.path.exists(sample_path):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Sample CT scan not found at data/sample_ct.nii.gz",
+        )
+
+    engine: SpleenInferenceEngine = getattr(app.state, "engine", None)
+    if engine is None:
+        engine = get_inference_engine()
+
+    return await run_prediction_on_file(sample_path, engine)
 
 
 @app.post("/predict/mask", tags=["Inference"])
@@ -174,7 +231,10 @@ async def predict_mask(
     Accepts a 3D CT scan upload (.nii.gz), runs inference,
     and returns the predicted 3D binary segmentation mask as a downloadable .nii.gz file.
     """
-    validate_filename(file.filename)
+    filename = file.filename or ""
+    name = filename.lower()
+    if not (name.endswith(".nii") or name.endswith(".nii.gz")):
+        raise HTTPException(400, "Only .nii or .nii.gz CT volumes are accepted.")
 
     temp_in = tempfile.NamedTemporaryFile(suffix=".nii.gz", delete=False)
     temp_path = temp_in.name
@@ -188,11 +248,7 @@ async def predict_mask(
         with open(temp_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
-        if os.path.getsize(temp_path) == 0:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Uploaded file is empty (0 bytes).",
-            )
+        validate_upload(filename, temp_path)
 
         engine: SpleenInferenceEngine = getattr(app.state, "engine", None)
         if engine is None:
