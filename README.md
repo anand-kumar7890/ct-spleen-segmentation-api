@@ -1,3 +1,15 @@
+---
+title: CT Spleen Volumetry
+emoji: 🫁
+colorFrom: teal
+colorTo: blue
+sdk: gradio
+sdk_version: "4.44.0"
+app_file: app.py
+pinned: false
+license: mit
+---
+
 # CT Spleen Segmentation API
 
 A 3D U-Net that segments the spleen from abdominal CT scans, served through a FastAPI service that returns the spleen volume as structured JSON.
@@ -209,10 +221,21 @@ You should see both containers with `healthy` status:
 
 ### 3. Access Endpoints
 
-- **Frontend Dashboard (Web UI)**: [http://localhost:3000](http://localhost:3000)
-- **Backend API (single container / no Compose)**: [http://localhost:8000](http://localhost:8000)
-- **Backend Swagger API Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
-- **Health Check**: [http://localhost:3000/health](http://localhost:3000/health) or [http://localhost:8000/health](http://localhost:8000/health)
+**Docker Compose (two-container stack):**
+- **Frontend Web UI**: [http://localhost:3000](http://localhost:3000) — Nginx serving the dark-theme dashboard
+- **Backend API**: [http://localhost:8000](http://localhost:8000) — FastAPI (JSON only, no browser UI)
+- **Swagger docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
+- **Health check**: [http://localhost:3000/health](http://localhost:3000/health) or [http://localhost:8000/health](http://localhost:8000/health)
+
+**Single container (no Compose):**
+```bash
+docker build -t ct-spleen-api .
+docker run -d --name ct-spleen-api -p 8000:8000 ct-spleen-api
+```
+Opens the backend API only at [http://localhost:8000](http://localhost:8000). The Nginx frontend is not included in single-container mode.
+
+**Hugging Face Spaces:**
+The Gradio UI (`app.py`) runs on the standard Gradio port (7860) inside the Space container. HF routes all public traffic through its own proxy — you access it at your Space URL, not on a local port.
 
 ### 4. Useful Docker Commands
 
@@ -243,7 +266,7 @@ pytest -v tests/
 ```
 
 ### Test data and requirements for cloners
-- **Smoke test scan (`data/sample_ct.nii.gz`)**: A small CT-like volume included in the repository. It is a smoke-test file only; its output is not a real measurement. It is used solely to verify server startup, tensor shape handling, and endpoint routing without distributing patient scans.
+- **Smoke-test file (`data/sample_ct.nii.gz`)**: Included solely to verify application startup, tensor shape handling and endpoint routing. It is not a clinical scan, and its output is not a real spleen measurement.
 - **Out of the box**: 20 of 21 tests pass immediately using only `sample_ct.nii.gz` and the static web UI.
 - **Different-spacing test (`test_predict_different_spacing_accuracy`)**: Specifically validates `spleen_15.nii.gz` against `spleen_volumes.json`. If `spleen_15.nii.gz` is not in `data/`, this test automatically skips so cloners will not experience test failures. To run it, place `spleen_15.nii.gz` into `data/`.
 
@@ -251,7 +274,7 @@ pytest -v tests/
 
 ## Repo Hygiene
 
-- **Minimal Scan Footprint**: Only the lightweight smoke-test volume (`data/sample_ct.nii.gz`, ~500 KB) is tracked in Git.
+- **Minimal Scan Footprint**: Only the lightweight smoke-test file (`data/sample_ct.nii.gz`, ~500 KB) is tracked in Git. Its output is not a real measurement.
 - **Docker Isolation**: `.dockerignore` and `.gitignore` exclude raw dataset archives, full patient CT volumes, and temporary prediction masks from being shipped into the Docker image or committed to version control.
 
 ---
