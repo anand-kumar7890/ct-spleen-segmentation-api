@@ -140,11 +140,7 @@ def _build_outputs(result, mask_path, elapsed):
 
 with gr.Blocks(
     title="CT Spleen Volumetry",
-    theme=gr.themes.Base(
-        primary_hue="teal",
-        secondary_hue="slate",
-        neutral_hue="slate",
-    ),
+    theme=gr.themes.Soft(),
     css="""
         #header { text-align: center; margin-bottom: 8px; }
         #disclaimer {
@@ -248,4 +244,4 @@ with gr.Blocks(
     )
 
 if __name__ == "__main__":
-    demo.launch()
+    demo.launch(server_name="0.0.0.0", server_port=7860)
