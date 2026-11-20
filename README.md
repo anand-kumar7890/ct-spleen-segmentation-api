@@ -48,7 +48,7 @@ The platform provides a modern dark-theme medical imaging dashboard hosted on **
 |---|---|
 | Validation Dice (best checkpoint, resampled space) | 0.9375 |
 | Validation Dice (original image spacing) | 0.9427 |
-| **CPU Inference Latency** | **23.0 s** (`spleen_15`, $512 \times 512 \times 38$ volume on CPU) |
+| **CPU Inference Latency** | **23.0 s** (`spleen_15`, 512 x 512 x 38 volume on CPU) |
 
 **Read this before trusting the number:**
 - Dataset: Medical Segmentation Decathlon, Task09 Spleen (41 labeled CT scans, ~1.50 GB archive).
@@ -66,17 +66,34 @@ The platform provides a modern dark-theme medical imaging dashboard hosted on **
 
 ---
 
-## Different-spacing test
+## Native-space check (spleen_15)
 
-To verify that the predicted segmentation mask is accurately mapped back to native space (rather than evaluated in resampled $1.5 \times 1.5 \times 2.0\text{ mm}$ space), the API was tested on **`spleen_15`**:
-- **Native Scan Spacing**: $0.74 \times 0.74 \times 5.0\text{ mm}$ ($\text{voxel volume} \approx 2.74\text{ mm}^3$ vs resampled $4.50\text{ mm}^3$)
-- **Native Dimensions**: $512 \times 512 \times 38$
-- **Colab reference prediction (`spleen_volumes.json`)**: **111.7 mL**
-- **API `/predict` Measured Output**: **111.7 mL** (40,788 voxels $\times 2.7397\text{ mm}^3 / 1000 = 111.748\text{ mL}$)
+To check that the mask is mapped back to the scan's native space, the API was run on spleen_15.
+- **Native Scan Spacing**: 0.74 x 0.74 x 5.0 mm (voxel volume ≈ 2.74 mm³ vs resampled 4.50 mm³)
+- **Native Dimensions**: 512 x 512 x 38
+- **Reference volume from the training notebook (spleen_volumes.json)**: **111.7 mL**
+- **API `/predict` Measured Output**: **111.7 mL** (40,788 voxels × 2.7397 mm³ / 1000 = 111.748 mL)
 
-$$\text{API Output: } 111.7\text{ mL} \equiv \text{Colab Reference Prediction: } 111.7\text{ mL}$$
+This shows the API reproduces the notebook's result on this scan. It is a consistency check, not an accuracy measure.
 
-This check shows the API and the training notebook agree. It confirms the API matches the notebook pipeline in native space (it does not prove the volume is anatomically correct, as `spleen_15` comes from the unlabeled test set).
+---
+
+## Evaluation against MSD labels
+
+API volume vs MSD label volume, measured with [`eval_api.py`](eval_api.py):
+
+| Scan | Label volume (mL) | API (mL) | Error |
+|---|---|---|---|
+| spleen_10 | 253.1 | 247.7 | -2.1% |
+| spleen_12 | 458.4 | 452.2 | -1.4% |
+| spleen_13 | 280.8 | 275.6 | -1.9% |
+| spleen_14 | 450.2 | 440.5 | -2.2% |
+| spleen_16 | 201.4 | 188.7 | -6.3% |
+| spleen_17 | 90.7 | 85.8 | -5.4% |
+| spleen_18 | 221.1 | 215.8 | -2.4% |
+| spleen_19 | 307.5 | 308.5 | +0.3% |
+
+Mean absolute error **2.8%**. Seven of eight volumes fall below the label (slight boundary under-segmentation). Training and validation scans are not separated, so this is not a generalization measure.
 
 ---
 
@@ -125,7 +142,7 @@ Response payload (real output from `spleen_15`):
 ```
 
 - **Execution Latency**: 23.00 seconds on CPU.
-- `needs_review` is `true` when the mask is empty, fragmented across disconnected components, or the volume is outside a plausible range (<30 mL or >650 mL), so a human checks the result instead of trusting it.
+- `needs_review` is `true` when the mask is empty, fragmented across disconnected components, or the volume is outside a plausible range (<30 mL or >650 mL), triggering automated sanity checks so a human reviews the result instead of trusting it.
 - `review_reasons` provides transparent diagnostic explanations if flagged.
 - `connected_components` detects potential accessory spleens or false-positive segmentation islands.
 
@@ -193,6 +210,7 @@ You should see both containers with `healthy` status:
 ### 3. Access Endpoints
 
 - **Frontend Dashboard (Web UI)**: [http://localhost:3000](http://localhost:3000)
+- **Backend API (single container / no Compose)**: [http://localhost:8000](http://localhost:8000)
 - **Backend Swagger API Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
 - **Health Check**: [http://localhost:3000/health](http://localhost:3000/health) or [http://localhost:8000/health](http://localhost:8000/health)
 
@@ -225,7 +243,7 @@ pytest -v tests/
 ```
 
 ### Test data and requirements for cloners
-- **Smoke test scan (`data/sample_ct.nii.gz`)**: A small synthetic CT volume included in the repository, used solely as a CI smoke test to verify server startup, tensor shape handling, and endpoint routing without distributing patient scans.
+- **Smoke test scan (`data/sample_ct.nii.gz`)**: A small CT-like volume included in the repository. It is a smoke-test file only; its output is not a real measurement. It is used solely to verify server startup, tensor shape handling, and endpoint routing without distributing patient scans.
 - **Out of the box**: 20 of 21 tests pass immediately using only `sample_ct.nii.gz` and the static web UI.
 - **Different-spacing test (`test_predict_different_spacing_accuracy`)**: Specifically validates `spleen_15.nii.gz` against `spleen_volumes.json`. If `spleen_15.nii.gz` is not in `data/`, this test automatically skips so cloners will not experience test failures. To run it, place `spleen_15.nii.gz` into `data/`.
 
@@ -233,7 +251,7 @@ pytest -v tests/
 
 ## Repo Hygiene
 
-- **Minimal Scan Footprint**: Only the lightweight synthetic smoke test volume (`data/sample_ct.nii.gz`, ~500 KB) is tracked in Git.
+- **Minimal Scan Footprint**: Only the lightweight smoke-test volume (`data/sample_ct.nii.gz`, ~500 KB) is tracked in Git.
 - **Docker Isolation**: `.dockerignore` and `.gitignore` exclude raw dataset archives, full patient CT volumes, and temporary prediction masks from being shipped into the Docker image or committed to version control.
 
 ---
