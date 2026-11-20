@@ -1,3 +1,13 @@
+---
+title: CT Spleen Volumetry
+emoji: 🩻
+colorFrom: blue
+colorTo: green
+sdk: docker
+app_port: 8000
+pinned: false
+---
+
 # CT Spleen Segmentation API
 
 A 3D U-Net that segments the spleen from abdominal CT scans, served through a FastAPI service that returns the spleen volume as structured JSON.
