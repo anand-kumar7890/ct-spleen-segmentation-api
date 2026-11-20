@@ -1,24 +1,3 @@
----
-title: CT Spleen Volumetry
-emoji: 🫁
-colorFrom: blue
-colorTo: green
-sdk: gradio
-python_version: "3.11"
-sdk_version: "5.9.1"
-app_file: app.py
-pinned: false
-license: mit
-short_description: Spleen volume from CT scans via 3D U-Net (MONAI).
-tags:
-  - medical-imaging
-  - segmentation
-  - monai
-  - pytorch
-  - spleen
-  - volumetry
----
-
 # CT Spleen Segmentation API
 
 A 3D U-Net that segments the spleen from abdominal CT scans, served through a FastAPI service that returns the spleen volume as structured JSON.
@@ -242,9 +221,6 @@ docker build -t ct-spleen-api .
 docker run -d --name ct-spleen-api -p 8000:8000 ct-spleen-api
 ```
 Opens the backend API only at [http://localhost:8000](http://localhost:8000). The Nginx frontend is not included in single-container mode.
-
-**Hugging Face Spaces:**
-The Gradio UI (`app.py`) runs on the standard Gradio port (7860) inside the Space container. HF routes all public traffic through its own proxy — you access it at your Space URL, not on a local port.
 
 ### 4. Useful Docker Commands
 
