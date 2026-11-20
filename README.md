@@ -9,7 +9,7 @@ sdk_version: "4.44.0"
 app_file: app.py
 pinned: false
 license: mit
-short_description: 3D U-Net spleen segmentation from CT scans. Upload NIfTI, get volume in mL.
+short_description: Spleen volume from CT scans via 3D U-Net (MONAI).
 tags:
   - medical-imaging
   - segmentation
