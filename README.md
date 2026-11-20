@@ -19,15 +19,15 @@ Upload a CT volume (NIfTI), get back the spleen volume in mL.
 
 ## Web demo
 
-A lightweight browser interface is served directly by FastAPI at `http://localhost:8000/`.
+The platform provides a modern dark-theme medical imaging dashboard hosted on **`http://localhost:3000`**:
 
-1. Start the server (locally or with Docker):
+1. Start the Docker stack:
    ```bash
-   uvicorn app.main:app --reload
+   docker compose up -d
    ```
-2. Open [http://localhost:8000](http://localhost:8000) in your browser.
-3. Click **"Use sample scan"** for an immediate test run, or choose your own `.nii` / `.nii.gz` CT volume.
-4. **Note on CPU Latency**: Full 3D abdominal volumes take **20–30 seconds** on CPU due to 3D patch convolutions. The built-in smoke test scan completes in under 2 seconds.
+2. Open [http://localhost:3000](http://localhost:3000) in your browser.
+3. Click **"Try sample scan"** for an immediate test run, or drag and drop any `.nii` / `.nii.gz` CT volume.
+4. **Note on CPU Latency**: Full 3D abdominal volumes take **20–30 seconds** on CPU due to 3D sliding-window patch convolutions. The built-in smoke test scan completes in ~2–3 seconds.
 
 ---
 
@@ -170,31 +170,51 @@ uvicorn app.main:app --reload
 
 ## Run with Docker
 
-### Option 1: Multi-Container Stack with Docker Compose (Recommended)
+### 1. Start the Application (Recommended)
 
 Starts both the Nginx Frontend (`http://localhost:3000`) and the FastAPI Backend (`http://localhost:8000`):
 
 ```bash
-docker compose up --build -d
+docker compose up -d
 ```
 
-- **Frontend Dashboard**: [http://localhost:3000](http://localhost:3000)
-- **Backend API Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
-- **Health Check**: [http://localhost:8000/health](http://localhost:8000/health)
+*(If you updated code and want to rebuild before running, use `docker compose up -d --build`)*
 
-To stop the containers:
+### 2. Verify Container Status
+
 ```bash
-docker compose down
+docker compose ps
 ```
 
-### Option 2: Standalone Single Container (Direct Backend with Embedded UI)
+You should see both containers with `healthy` status:
+- **`ct-spleen-frontend`** on port `3000`
+- **`ct-spleen-backend`** on port `8000`
+
+### 3. Access Endpoints
+
+- **Frontend Dashboard (Web UI)**: [http://localhost:3000](http://localhost:3000)
+- **Backend Swagger API Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
+- **Health Check**: [http://localhost:3000/health](http://localhost:3000/health) or [http://localhost:8000/health](http://localhost:8000/health)
+
+### 4. Useful Docker Commands
+
+| Action | Command |
+| :--- | :--- |
+| **Start everything** | `docker compose up -d` |
+| **Stop everything** | `docker compose down` |
+| **Restart services** | `docker compose restart` |
+| **Clean restart (if stuck)** | `docker compose down && docker compose up -d` |
+| **View live logs** | `docker compose logs -f` |
+| **Run test suite inside container** | `docker exec ct-spleen-backend pytest -v tests/` |
+
+### Option 2: Standalone Single Container Mode
+
+If you prefer running a single container without Compose:
 
 ```bash
 docker build -t ct-spleen-api .
 docker run -d --name ct-spleen-api -p 8000:8000 ct-spleen-api
 ```
-
-Open [http://localhost:8000](http://localhost:8000) in your browser to interact with the web UI directly.
 
 ---
 
